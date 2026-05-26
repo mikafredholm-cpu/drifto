@@ -155,13 +155,21 @@ function TaskCard({ task, onClick, showAssignee }) {
   );
 }
 
-function TaskModal({ task, currentUser, onClose, onUpdate, onDelete, onArchive, toast }) {
+function TaskModal({ task, users, currentUser, onClose, onUpdate, onDelete, onArchive, toast }) {
   const [comment, setComment] = useState("");
   const [lightbox, setLightbox] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [uploading, setUploading] = useState(false);
   const isAdmin = currentUser.role === "admin";
   const fileRef = useRef();
+  const workers = users.filter(u => u.role === "worker");
+
+  const changeAssignee = (username) => {
+    const worker = users.find(u => u.username === username);
+    const updated = { ...task, assignee: username, assignee_name: worker?.name || username };
+    onUpdate(updated, { assignee: username, assignee_name: worker?.name || username });
+    toast("Tilldelad uppdaterad");
+  };
 
   const toggleCheck = (id) => {
     if (isAdmin) return;
@@ -213,7 +221,15 @@ function TaskModal({ task, currentUser, onClose, onUpdate, onDelete, onArchive, 
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-4">
-            <span>👤 {task.assignee_name}</span>
+            <span>
+              {isAdmin ? (
+                <select value={task.assignee} onChange={e => changeAssignee(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {workers.map(w => <option key={w.id} value={w.username}>{w.name}</option>)}
+                </select>
+              ) : (
+                <span>👤 {task.assignee_name}</span>
+              )}
+            </span>
             <span>📅 {task.deadline}</span>
             {isOverdue(task) && <span className="text-red-600 font-semibold col-span-2">⚠ Försenad</span>}
           </div>
@@ -669,7 +685,7 @@ export default function App() {
 
       {openTask && (
         <TaskModal
-          task={openTask} currentUser={currentUser}
+          task={openTask} users={users} currentUser={currentUser}
           onClose={() => setOpenTask(null)}
           onUpdate={updateTask} onDelete={deleteTask} onArchive={archiveTask}
           toast={toast}
