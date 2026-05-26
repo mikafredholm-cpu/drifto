@@ -41,8 +41,8 @@ const db = {
     if (error || !data) return null;
     return data;
   },
-  async getUsers() {
-    const { data } = await supabase.from("users").select("*").order("id");
+  async getUsers(companyId) {
+    const { data } = await supabase.from("users").select("*").eq("company_id", companyId).order("id");
     return data || [];
   },
   async addUser(u) {
@@ -55,8 +55,8 @@ const db = {
   async deleteUser(id) {
     await supabase.from("users").delete().eq("id", id);
   },
-  async getTasks() {
-    const { data } = await supabase.from("tasks").select("*").order("created_at", { ascending: false });
+  async getTasks(companyId) {
+    const { data } = await supabase.from("tasks").select("*").eq("company_id", companyId).order("created_at", { ascending: false });
     return (data || []).map(normalizeTask);
   },
   async addTask(t) {
@@ -299,7 +299,7 @@ function TaskModal({ task, users, currentUser, onClose, onUpdate, onDelete, onAr
   );
 }
 
-function NewTaskModal({ users, onClose, onCreate, toast }) {
+function NewTaskModal({ users, currentUser, onClose, onCreate, toast }) {
   const workers = users.filter(u => u.role === "worker");
   const [form, setForm] = useState({ title: "", address: "", description: "", deadline: "", assignee: workers[0]?.username || "" });
   const [checklist, setChecklist] = useState([]);
@@ -323,7 +323,9 @@ function NewTaskModal({ users, onClose, onCreate, toast }) {
       title: form.title, address: form.address, description: form.description,
       assignee: form.assignee, assignee_name: worker?.name || form.assignee,
       deadline: form.deadline || null, checklist: finalChecklist,
-      comments: [], photo_url: null, status: "Ej påbörjad", created_at: new Date().toISOString(),
+      comments: [], photo_url: null, status: "Ej påbörjad",
+      created_at: new Date().toISOString(),
+      company_id: currentUser.company_id,
     });
     onClose();
     toast("Uppgift skapad");
@@ -381,7 +383,7 @@ function SettingsPage({ users, reloadUsers, company, setCompany, toast }) {
   const addUser = async () => {
     if (!newUser.name || !newUser.username || !newUser.password) { toast("Fyll i alla fält", "error"); return; }
     if (users.find(u => u.username === newUser.username)) { toast("Användarnamnet finns redan", "error"); return; }
-    await db.addUser({ ...newUser, created_at: new Date().toISOString() });
+    await db.addUser({ ...newUser, created_at: new Date().toISOString(), company_id: users[0]?.company_id });
     await reloadUsers();
     setNewUser({ name: "", username: "", password: "", role: "worker" }); setShowAdd(false);
     toast("Användare skapad");
@@ -602,8 +604,8 @@ export default function App() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2500);
   };
 
-  const reloadUsers = useCallback(async () => setUsers(await db.getUsers()), []);
-  const reloadTasks = useCallback(async () => setTasks(await db.getTasks()), []);
+  const reloadUsers = useCallback(async () => setUsers(await db.getUsers(currentUser.company_id)), [currentUser]);
+  const reloadTasks = useCallback(async () => setTasks(await db.getTasks(currentUser.company_id)), [currentUser]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -691,7 +693,7 @@ export default function App() {
           toast={toast}
         />
       )}
-      {showNew && <NewTaskModal users={users} onClose={() => setShowNew(false)} onCreate={createTask} toast={toast} />}
+      {showNew && <NewTaskModal users={users} currentUser={currentUser} onClose={() => setShowNew(false)} onCreate={createTask} toast={toast} />}
     </div>
   );
 }
